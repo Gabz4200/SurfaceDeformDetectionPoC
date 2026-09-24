@@ -1,0 +1,5 @@
+project-includes = ["src"]
+search-path = ["src"]
+python-version = "3.11"
+output-format = "full-text"
+preset = "strict"

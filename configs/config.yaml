@@ -1,0 +1,5 @@
+defaults:
+  - data: poc
+  - model: yolo26n
+  - device: cpu
+  - training: poc
