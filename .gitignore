@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# SurfaceDeformDetectionPoC artifacts
+inspections.db
+results/
+models/
+outputs/
+.multirun/

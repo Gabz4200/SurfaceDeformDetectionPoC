@@ -1,0 +1,9 @@
+root: data
+out: models/yolo_dataset
+classes: null
+meta: data/severstal-DatasetNinja/meta.json
+val_fraction: 0.2
+seed: 42
+subset_n: 200
+min_per_class: 15
+max_bg_fraction: 0.25
