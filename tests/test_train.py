@@ -11,7 +11,7 @@ class _FakeYOLO:
     def __init__(self, weights: str) -> None:
         type(self).seen["weights"] = weights
 
-    def train(self, **kwargs):  # type: ignore[no-untyped-def]
+    def train(self, **kwargs):
         type(self).seen.update(kwargs)
         best = Path(kwargs["project"]) / kwargs["name"] / "weights" / "best.pt"
         best.parent.mkdir(parents=True, exist_ok=True)

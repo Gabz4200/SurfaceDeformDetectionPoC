@@ -21,16 +21,14 @@ class _Result:
 def test_when_constructed_then_prd_default_thresholds() -> None:
     from surfacedeformdetectionpoc.inference import Detector
 
-    d = Detector.__new__(Detector)
     assert Detector.DEFAULT_CONF == 0.25
     assert Detector.DEFAULT_IOU == 0.45
-    assert d is not None
 
 
 def test_when_low_conf_then_filtered_with_names_and_boxes() -> None:
     from surfacedeformdetectionpoc.inference import results_to_detections
 
-    dets = results_to_detections([_Result()], conf=0.25)  # type: ignore[arg-type]
+    dets = results_to_detections([_Result()], conf=0.25)
     assert len(dets) == 1
     assert dets[0].label == "dent"
     assert dets[0].confidence == pytest.approx(0.9)
