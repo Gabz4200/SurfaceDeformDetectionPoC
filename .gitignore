@@ -223,3 +223,7 @@ results/
 models/
 outputs/
 .multirun/
+data/
+*.tar
+*.tar.gz
+*.zip
