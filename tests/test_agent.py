@@ -10,18 +10,18 @@ import pytest
 
 
 class _HitDetector:
-    def predict(self, image: np.ndarray):  # type: ignore[no-untyped-def]
+    def predict(self, image: np.ndarray):
         from surfacedeformdetectionpoc.inference import Detection
 
         return [Detection(label="dent", class_id=1, confidence=0.9, bbox=(5, 5, 20, 20))]
 
 
 class _CleanDetector:
-    def predict(self, image: np.ndarray):  # type: ignore[no-untyped-def]
+    def predict(self, image: np.ndarray):
         return []
 
 
-def _agent(detector, tmp: str):  # type: ignore[no-untyped-def]
+def _agent(detector, tmp: str):
     from surfacedeformdetectionpoc.agent import AutomotiveInspectionAgent
     from surfacedeformdetectionpoc.database import InspectionDB
 

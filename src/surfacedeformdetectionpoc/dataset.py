@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import random
 import shutil
 import zlib
@@ -25,10 +26,9 @@ def discover_images(data_root: Path) -> list[Path]:
     Returns:
         Sorted list of image paths.
     """
-    found = [
+    return [
         p for p in sorted(data_root.rglob("*")) if p.is_file() and p.suffix.lower() in IMAGE_EXTS
     ]
-    return found
 
 
 def decode_bitmap(data_b64: str) -> np.ndarray:
@@ -108,8 +108,6 @@ def class_names_from_meta(meta_path: str | Path) -> list[str]:
     Returns:
         Class titles in file order.
     """
-    import json
-
     meta = json.loads(Path(meta_path).read_text())
     return [str(c["title"]) for c in meta["classes"]]
 
@@ -127,8 +125,6 @@ def image_classes(image: Path, class_names: list[str]) -> set[str]:
     Raises:
         ValueError: On unknown class index or title.
     """
-    import json
-
     label = _sibling_label(image)
     if label is not None:
         found: set[str] = set()
@@ -258,8 +254,6 @@ def build_yolo_dataset(
     Returns:
         Path to the written ``dataset.yaml``.
     """
-    import json
-
     images = [Path(p) for p in select] if select is not None else discover_images(Path(data_root))
     rng = random.Random(seed)
     shuffled = images[:]

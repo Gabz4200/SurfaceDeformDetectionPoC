@@ -51,8 +51,8 @@ def test_when_sample_twice_then_deterministic(tmp_path: Path) -> None:
     root = tmp_path / "data"
     _layout(root)
     kwargs: dict = {"class_names": ["aa", "bb"], "min_per_class": 1, "seed": 7}
-    first = sample_stratified(root, 5, **kwargs)  # type: ignore[arg-type]
-    second = sample_stratified(root, 5, **kwargs)  # type: ignore[arg-type]
+    first = sample_stratified(root, 5, **kwargs)
+    second = sample_stratified(root, 5, **kwargs)
     assert [p.name for p in first] == [p.name for p in second]
 
 
