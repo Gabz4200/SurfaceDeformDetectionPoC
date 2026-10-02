@@ -26,9 +26,7 @@ def discover_images(data_root: Path) -> list[Path]:
     Returns:
         Sorted list of image paths.
     """
-    return [
-        p for p in sorted(data_root.rglob("*")) if p.is_file() and p.suffix.lower() in IMAGE_EXTS
-    ]
+    return sorted(p for p in data_root.rglob("*") if p.suffix.lower() in IMAGE_EXTS and p.is_file())
 
 
 def decode_bitmap(data_b64: str) -> np.ndarray:
@@ -75,19 +73,20 @@ def annotation_to_yolo_lines(
         ValueError: On unknown geometry, unknown class, or empty mask.
     """
     lines: list[str] = []
+    index = {name: i for i, name in enumerate(class_names)}
     for obj in ann.get("objects", []):
         if obj.get("geometryType") != "bitmap":
             raise ValueError(f"Unsupported geometry: {obj.get('geometryType')}.")
         title = obj.get("classTitle")
-        if title not in class_names:
+        if title not in index:
             raise ValueError(f"Unknown class {title!r}, expected one of {class_names}.")
         mask = decode_bitmap(obj["bitmap"]["data"])
         if not mask.any():
             raise ValueError("Empty bitmap mask.")
         rows = np.any(mask, axis=1)
         cols = np.any(mask, axis=0)
-        top, bottom = int(np.argmax(rows)), int(len(rows) - 1 - np.argmax(rows[::-1]))
-        left, right = int(np.argmax(cols)), int(len(cols) - 1 - np.argmax(cols[::-1]))
+        ys, xs = np.flatnonzero(rows), np.flatnonzero(cols)
+        top, bottom, left, right = int(ys[0]), int(ys[-1]), int(xs[0]), int(xs[-1])
         ox, oy = obj["bitmap"]["origin"]
         x_min, y_min = ox + left, oy + top
         x_max, y_max = ox + right + 1, oy + bottom + 1
@@ -95,7 +94,7 @@ def annotation_to_yolo_lines(
         yc = (y_min + y_max) / 2 / img_h
         w = (x_max - x_min) / img_w
         h = (y_max - y_min) / img_h
-        lines.append(f"{class_names.index(title)} {xc:.6f} {yc:.6f} {w:.6f} {h:.6f}")
+        lines.append(f"{index[title]} {xc:.6f} {yc:.6f} {w:.6f} {h:.6f}")
     return lines
 
 
@@ -174,30 +173,37 @@ def sample_stratified(
         raise ValueError(f"Requested {n} images but found {len(images)}.")
     rng = random.Random(seed)
     buckets: dict[str, list[Path]] = {c: [] for c in class_names}
+    img_labels: dict[Path, set[str]] = {}
     bg: list[Path] = []
     for img in images:
-        cls = image_classes(img, class_names)
-        if not cls:
+        present = image_classes(img, class_names)
+        img_labels[img] = present
+        if not present:
             bg.append(img)
-        for c in cls:
+        for c in present:
             buckets[c].append(img)
     missing = [c for c in class_names if not buckets[c]]
     if missing:
         raise ValueError(f"Classes absent from data: {missing}.")
     taken: list[Path] = []
     taken_set: set[Path] = set()
+    taken_counts: dict[str, int] = dict.fromkeys(class_names, 0)
     for c in sorted(class_names, key=lambda k: len(buckets[k])):
         cands = buckets[c][:]
         rng.shuffle(cands)
-        need = min_per_class - sum(1 for t in taken if t in buckets[c])
+        need = min_per_class - taken_counts[c]
         for p in cands:
             if need <= 0:
                 break
-            if p not in taken_set:
-                taken.append(p)
-                taken_set.add(p)
-                need -= 1
-    labeled = [p for p in images if p not in bg and p not in taken_set]
+            if p in taken_set:
+                continue
+            taken.append(p)
+            taken_set.add(p)
+            for c2 in img_labels[p]:
+                taken_counts[c2] += 1
+            need -= 1
+    bg_set = set(bg)
+    labeled = [p for p in images if p not in bg_set and p not in taken_set]
     rng.shuffle(labeled)
     bg_shuffled = bg[:]
     rng.shuffle(bg_shuffled)
@@ -206,27 +212,44 @@ def sample_stratified(
     return sorted(chosen)
 
 
+def _first_existing(cands: list[Path]) -> Path | None:
+    return next((c for c in cands if c.is_file()), None)
+
+
 def _sibling_ann_json(image: Path) -> Path | None:
     names = [f"{image.name}.json", f"{image.stem}.json"]
     dirs = [image.parent / "ann", image.parent.parent / "ann", image.parent]
-    for d in dirs:
-        for n in names:
-            c = d / n
-            if c.is_file():
-                return c
-    return None
+    return _first_existing([d / n for d in dirs for n in names])
 
 
 def _sibling_label(image: Path) -> Path | None:
-    candidates = [
-        image.with_suffix(".txt"),
-        image.parent / "ann" / f"{image.stem}.txt",
-        image.parent.parent / "ann" / f"{image.stem}.txt",
-    ]
-    for c in candidates:
-        if c.is_file():
-            return c
-    return None
+    return _first_existing(
+        [
+            image.with_suffix(".txt"),
+            image.parent / "ann" / f"{image.stem}.txt",
+            image.parent.parent / "ann" / f"{image.stem}.txt",
+        ]
+    )
+
+
+def _write_label(src: Path, dest_lbl: Path, class_names: list[str]) -> None:
+    label = _sibling_label(src)
+    if label is not None:
+        shutil.copyfile(label, dest_lbl)
+        return
+    ann_path = _sibling_ann_json(src)
+    if ann_path is not None:
+        img = cv2.imread(str(src), cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            raise ValueError(f"Unreadable image: {src}.")
+        h, w = img.shape[:2]
+        ann = json.loads(ann_path.read_text())
+        dest_lbl.write_text(
+            "\n".join(annotation_to_yolo_lines(ann, w, h, class_names))
+            + ("\n" if ann.get("objects") else "")
+        )
+    else:
+        dest_lbl.write_text("")
 
 
 def build_yolo_dataset(
@@ -261,30 +284,14 @@ def build_yolo_dataset(
     n_val = int(len(shuffled) * val_fraction)
     splits = {"val": shuffled[:n_val], "train": shuffled[n_val:]}
     out = Path(out_dir)
+    for split in ("train", "val"):
+        (out / "images" / split).mkdir(parents=True, exist_ok=True)
+        (out / "labels" / split).mkdir(parents=True, exist_ok=True)
     for split, paths in splits.items():
         for src in paths:
             dest_img = out / "images" / split / f"{src.stem}{src.suffix.lower()}"
-            dest_img.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(src, dest_img)
-            dest_lbl = out / "labels" / split / f"{src.stem}.txt"
-            dest_lbl.parent.mkdir(parents=True, exist_ok=True)
-            label = _sibling_label(src)
-            if label is not None:
-                dest_lbl.write_text(label.read_text())
-                continue
-            ann_path = _sibling_ann_json(src)
-            if ann_path is not None:
-                img = cv2.imread(str(src))
-                if img is None:
-                    raise ValueError(f"Unreadable image: {src}.")
-                h, w = img.shape[:2]
-                ann = json.loads(ann_path.read_text())
-                dest_lbl.write_text(
-                    "\n".join(annotation_to_yolo_lines(ann, w, h, class_names))
-                    + ("\n" if ann.get("objects") else "")
-                )
-            else:
-                dest_lbl.write_text("")
+            _write_label(src, out / "labels" / split / f"{src.stem}.txt", class_names)
     yaml_path = out / "dataset.yaml"
     yaml_path.write_text(
         yaml.safe_dump(

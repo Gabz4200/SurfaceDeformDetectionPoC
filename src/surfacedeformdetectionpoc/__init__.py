@@ -14,7 +14,11 @@ def _prepare(args: argparse.Namespace) -> int:
 
     names = class_names_from_meta(args.meta) if args.meta else args.classes
     yaml_path = build_yolo_dataset(
-        Path(args.data), Path(args.out), names, args.val_fraction, args.seed
+        data_root=Path(args.data),
+        out_dir=Path(args.out),
+        class_names=names,
+        val_fraction=args.val_fraction,
+        seed=args.seed,
     )
     logger.info("Dataset ready: %s", yaml_path)
     return 0
@@ -24,13 +28,13 @@ def _train(args: argparse.Namespace) -> int:
     from surfacedeformdetectionpoc.train import train_model
 
     best = train_model(
-        args.data_yaml,
-        args.weights,
-        args.epochs,
-        args.imgsz,
-        args.device,
-        args.project,
-        args.name,
+        dataset_yaml=args.data_yaml,
+        weights=args.weights,
+        epochs=args.epochs,
+        imgsz=args.imgsz,
+        device=args.device,
+        project=args.project,
+        name=args.name,
     )
     logger.info("Best weights: %s", best)
     return 0

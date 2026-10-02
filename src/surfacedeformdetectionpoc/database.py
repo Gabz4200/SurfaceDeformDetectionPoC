@@ -18,9 +18,9 @@ class InspectionDB:
             path: Database file path.
         """
         self.path = Path(path)
-        if self.path.parent != Path("."):
-            self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.path))
+        self._conn.row_factory = sqlite3.Row
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS inspection_logs ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -75,7 +75,6 @@ class InspectionDB:
         Raises:
             KeyError: If no row has that id.
         """
-        self._conn.row_factory = sqlite3.Row
         row = self._conn.execute("SELECT * FROM inspection_logs WHERE id = ?", (row_id,)).fetchone()
         if row is None:
             raise KeyError(f"No inspection with id {row_id}.")

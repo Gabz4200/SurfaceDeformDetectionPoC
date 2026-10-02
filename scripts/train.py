@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
+from pathlib import Path
 
 import hydra
 from hydra.utils import to_absolute_path
@@ -21,38 +22,38 @@ def main(cfg: DictConfig) -> None:
     plan = build_run_plan(OmegaConf.to_container(cfg, resolve=True))
     plan = replace(
         plan,
-        data_root=to_absolute_path(str(plan.data_root)),
-        out_dir=to_absolute_path(str(plan.out_dir)),
-        project=to_absolute_path(str(plan.project)),
+        data_root=Path(to_absolute_path(str(plan.data_root))),
+        out_dir=Path(to_absolute_path(str(plan.out_dir))),
+        project=Path(to_absolute_path(str(plan.project))),
     )
     select = (
         sample_stratified(
-            plan.data_root,
-            plan.subset_n,
-            plan.class_names,
-            plan.min_per_class,
-            plan.max_bg_fraction,
-            plan.seed,
+            data_root=plan.data_root,
+            n=plan.subset_n,
+            class_names=plan.class_names,
+            min_per_class=plan.min_per_class,
+            max_bg_fraction=plan.max_bg_fraction,
+            seed=plan.seed,
         )
         if plan.subset_n is not None
         else None
     )
     yaml_path = build_yolo_dataset(
-        plan.data_root,
-        plan.out_dir,
-        plan.class_names,
-        plan.val_fraction,
-        plan.seed,
-        select,
+        data_root=plan.data_root,
+        out_dir=plan.out_dir,
+        class_names=plan.class_names,
+        val_fraction=plan.val_fraction,
+        seed=plan.seed,
+        select=select,
     )
     best = train_model(
-        yaml_path,
-        plan.weights,
-        plan.epochs,
-        plan.imgsz,
-        plan.device,
-        str(plan.project),
-        plan.name,
+        dataset_yaml=yaml_path,
+        weights=plan.weights,
+        epochs=plan.epochs,
+        imgsz=plan.imgsz,
+        device=plan.device,
+        project=str(plan.project),
+        name=plan.name,
     )
     logger.info("Best weights: %s", best)
 

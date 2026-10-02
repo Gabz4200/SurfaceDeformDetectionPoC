@@ -36,19 +36,19 @@ def results_to_detections(results: Any, conf: float) -> list[Detection]:
         if boxes is None:
             continue
         names: dict[int, str] = getattr(r, "names", {})
-        xyxy = np.asarray(boxes.xyxy).tolist()
-        confs = np.asarray(boxes.conf).tolist()
-        clses = np.asarray(boxes.cls).tolist()
-        for (x1, y1, x2, y2), c, k in zip(xyxy, confs, clses, strict=True):
-            if float(c) < conf:
-                continue
-            idx = int(k)
+        xyxy = np.asarray(boxes.xyxy)
+        confs = np.asarray(boxes.conf).ravel()
+        clses = np.asarray(boxes.cls).ravel()
+        for i in np.nonzero(confs >= conf)[0].tolist():
+            x1, y1, x2, y2 = tuple(float(v) for v in xyxy[i].tolist())
+            c = float(confs[i])
+            idx = int(clses[i])
             dets.append(
                 Detection(
                     label=names.get(idx, str(idx)),
                     class_id=idx,
-                    confidence=float(c),
-                    bbox=(float(x1), float(y1), float(x2), float(y2)),
+                    confidence=c,
+                    bbox=(x1, y1, x2, y2),
                 )
             )
     return dets
