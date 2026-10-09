@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 import random
 import shutil
@@ -42,13 +43,13 @@ def decode_bitmap(data_b64: str) -> np.ndarray:
         ValueError: If the payload cannot be decoded to a mask.
     """
     try:
-        raw = zlib.decompress(base64.b64decode(data_b64))
+        raw = zlib.decompress(base64.b64decode(data_b64, validate=True))
         img = cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
-    except Exception as e:
+    except (binascii.Error, zlib.error, ValueError) as e:
         raise ValueError(f"Undecodable bitmap mask: {e}") from e
     if img is None:
         raise ValueError("Undecodable bitmap mask.")
-    if img.ndim == 3 and img.shape[2] >= 4:
+    if img.ndim == 3 and img.shape[2] == 4:
         return img[:, :, 3].astype(bool)
     if img.ndim == 2:
         return img.astype(bool)
@@ -98,6 +99,11 @@ def annotation_to_yolo_lines(
     return lines
 
 
+def _read_json(path: Path) -> dict[str, Any]:
+    """Parse a JSON file into a dict."""
+    return json.loads(path.read_text())
+
+
 def class_names_from_meta(meta_path: str | Path) -> list[str]:
     """Read ordered class titles from a DatasetNinja ``meta.json``.
 
@@ -107,7 +113,7 @@ def class_names_from_meta(meta_path: str | Path) -> list[str]:
     Returns:
         Class titles in file order.
     """
-    meta = json.loads(Path(meta_path).read_text())
+    meta = _read_json(Path(meta_path))
     return [str(c["title"]) for c in meta["classes"]]
 
 
@@ -127,16 +133,25 @@ def image_classes(image: Path, class_names: list[str]) -> set[str]:
     label = _sibling_label(image)
     if label is not None:
         found: set[str] = set()
-        for line in label.read_text().splitlines():
-            if line.strip():
-                idx = int(line.split()[0])
-                if idx >= len(class_names):
-                    raise ValueError(f"Unknown class index {idx} in {label}.")
-                found.add(class_names[idx])
+        for lineno, line in enumerate(label.read_text().splitlines(), start=1):
+            if not line.strip():
+                continue
+            parts = line.split()
+            try:
+                idx = int(parts[0])
+            except (IndexError, ValueError) as e:
+                raise ValueError(f"Malformed label line {lineno} in {label}: {line!r}.") from e
+            if idx < 0 or idx >= len(class_names):
+                raise ValueError(f"Unknown class index {idx} in {label}.")
+            found.add(class_names[idx])
         return found
     ann_path = _sibling_ann_json(image)
     if ann_path is not None:
-        titles = {o.get("classTitle") for o in json.loads(ann_path.read_text()).get("objects", [])}
+        titles = {
+            o.get("classTitle")
+            for o in _read_json(ann_path).get("objects", [])
+            if o.get("classTitle") is not None
+        }
         unknown = titles - set(class_names)
         if unknown:
             raise ValueError(f"Unknown classes {sorted(unknown)} in {ann_path}.")
@@ -207,8 +222,14 @@ def sample_stratified(
     rng.shuffle(labeled)
     bg_shuffled = bg[:]
     rng.shuffle(bg_shuffled)
-    chosen = (taken + labeled)[: n - min(len(bg_shuffled), int(n * max_bg_fraction))]
-    chosen += bg_shuffled[: n - len(chosen)]
+    # Quota selections may already cover all of n (multi-class images count
+    # once but satisfy several quotas), so budget background against what is
+    # actually taken, never against a truncated slice of taken.
+    n_bg = min(int(n * max_bg_fraction), n - len(taken))
+    chosen = (taken + labeled)[: max(n - n_bg, len(taken))]
+    chosen += bg_shuffled[: max(n - len(chosen), 0)]
+    if len(chosen) != n:
+        raise ValueError(f"Stratified sampling produced {len(chosen)} of {n} images.")
     return sorted(chosen)
 
 
@@ -243,13 +264,19 @@ def _write_label(src: Path, dest_lbl: Path, class_names: list[str]) -> None:
         if img is None:
             raise ValueError(f"Unreadable image: {src}.")
         h, w = img.shape[:2]
-        ann = json.loads(ann_path.read_text())
+        ann = _read_json(ann_path)
         dest_lbl.write_text(
             "\n".join(annotation_to_yolo_lines(ann, w, h, class_names))
             + ("\n" if ann.get("objects") else "")
         )
     else:
         dest_lbl.write_text("")
+
+
+def _dest_stem(src: Path, data_root: Path) -> str:
+    """Flatten ``src``'s path under ``data_root`` into a collision-free stem."""
+    rel = src.relative_to(data_root).with_suffix("")
+    return rel.as_posix().replace("/", "__")
 
 
 def build_yolo_dataset(
@@ -276,8 +303,11 @@ def build_yolo_dataset(
 
     Returns:
         Path to the written ``dataset.yaml``.
+
+    Raises:
+        ValueError: If two images map to the same output name.
     """
-    images = [Path(p) for p in select] if select is not None else discover_images(Path(data_root))
+    images = [Path(p) for p in select] if select is not None else discover_images(data_root)
     rng = random.Random(seed)
     shuffled = images[:]
     rng.shuffle(shuffled)
@@ -287,11 +317,18 @@ def build_yolo_dataset(
     for split in ("train", "val"):
         (out / "images" / split).mkdir(parents=True, exist_ok=True)
         (out / "labels" / split).mkdir(parents=True, exist_ok=True)
+    seen: dict[str, Path] = {}
     for split, paths in splits.items():
         for src in paths:
-            dest_img = out / "images" / split / f"{src.stem}{src.suffix.lower()}"
+            stem = _dest_stem(src, data_root)
+            if stem in seen:
+                raise ValueError(
+                    f"Output name collision: {seen[stem]} and {src} both map to {stem}."
+                )
+            seen[stem] = src
+            dest_img = out / "images" / split / f"{stem}{src.suffix.lower()}"
             shutil.copyfile(src, dest_img)
-            _write_label(src, out / "labels" / split / f"{src.stem}.txt", class_names)
+            _write_label(src, out / "labels" / split / f"{stem}.txt", class_names)
     yaml_path = out / "dataset.yaml"
     yaml_path.write_text(
         yaml.safe_dump(

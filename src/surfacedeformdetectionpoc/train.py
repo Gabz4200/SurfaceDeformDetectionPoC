@@ -32,6 +32,25 @@ class RunPlan:
     name: str
 
 
+def resolve_class_names(meta: str | Path | None, classes: list[str] | None) -> list[str]:
+    """Resolve ordered class names from a DatasetNinja ``meta.json`` or a list.
+
+    Args:
+        meta: Path to ``meta.json``; takes precedence when both are given.
+        classes: Fallback class names.
+
+    Returns:
+        Class names in file or list order.
+
+    Raises:
+        ValueError: When neither source yields a name.
+    """
+    names = class_names_from_meta(meta) if meta else [str(c) for c in (classes or [])]
+    if not names:
+        raise ValueError("No class names: set data.classes or data.meta.")
+    return names
+
+
 def build_run_plan(cfg: Mapping[str, Any]) -> RunPlan:
     """Map a nested config mapping to a validated :class:`RunPlan`.
 
@@ -46,10 +65,7 @@ def build_run_plan(cfg: Mapping[str, Any]) -> RunPlan:
         ValueError: When no class names resolve.
     """
     data, model, device, training = cfg["data"], cfg["model"], cfg["device"], cfg["training"]
-    meta = data["meta"]
-    names = class_names_from_meta(meta) if meta else [str(c) for c in (data["classes"] or [])]
-    if not names:
-        raise ValueError("No class names: set data.classes or data.meta.")
+    names = resolve_class_names(data["meta"], data["classes"])
     return RunPlan(
         data_root=Path(data["root"]),
         out_dir=Path(data["out"]),
@@ -94,6 +110,8 @@ def train_model(
     Raises:
         FileNotFoundError: If ``best.pt`` is missing after training.
     """
+    if not Path(weights).is_file():
+        raise FileNotFoundError(f"Weights not found: {weights}.")
     model = YOLO(str(weights))
     model.train(
         data=str(dataset_yaml),
@@ -104,7 +122,13 @@ def train_model(
         name=name,
         verbose=False,
     )
-    best = Path(project) / name / "weights" / "best.pt"
+    # Ultralytics increments the run directory (sdd, sdd2, ...) when it
+    # already exists, so return the trainer's resolved save_dir rather than
+    # the requested name, which would point at a stale first run.
+    save_dir = getattr(model.trainer, "save_dir", None)
+    if save_dir is None:
+        raise RuntimeError("Trainer did not expose a save_dir after training.")
+    best = Path(save_dir) / "weights" / "best.pt"
     if not best.is_file():
         raise FileNotFoundError(f"Training produced no weights at {best}.")
     return best

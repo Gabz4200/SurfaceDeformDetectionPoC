@@ -1,7 +1,7 @@
 [project]
 name = "surfacedeformdetectionpoc"
 version = "0.1.0"
-description = "Add your description here"
+description = "Automated optical inspection of surface deformations on automotive sheet metal (CLAHE preprocessing + YOLO detection + SQLite logging)"
 readme = "README.md"
 authors = [
     { name = "Joao Gabriel Souza Amaral", email = "39097199+Gabz4200@users.noreply.github.com" }
@@ -28,15 +28,17 @@ cuda = [
 headless = [
     "opencv-python-headless>=4.8.0.76",
 ]
+kaggle = [
+    "kagglehub>=1.0.2",
+]
+
+[dependency-groups]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=5.0.0",
     "ruff>=0.6.0",
     "pyrefly>=0.24.0",
     "pre-commit>=3.8.0",
-]
-kaggle = [
-    "kagglehub>=1.0.2",
 ]
 
 [tool.uv]

@@ -24,12 +24,11 @@ def test_when_bad_slug_then_value_error() -> None:
         mod.upload_dataset("")
 
 
-def test_when_no_credentials_then_skip(monkeypatch) -> None:
+def test_when_no_credentials_then_skip(monkeypatch, tmp_path: Path) -> None:
     mod = _load()
-    monkeypatch.delenv("KAGGLE_USERNAME", raising=False)
-    monkeypatch.delenv("KAGGLE_KEY", raising=False)
-    monkeypatch.delenv("KAGGLE_API_TOKEN", raising=False)
-    monkeypatch.setattr(Path, "is_file", lambda self: False)
+    for var in ("KAGGLE_USERNAME", "KAGGLE_KEY", "KAGGLE_API_TOKEN"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     assert mod.upload_dataset("anyslug", _skip=True) is None
 
 

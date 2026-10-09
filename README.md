@@ -7,8 +7,9 @@ Automated optical inspection of surface deformations (scratches, dents, porosity
 Requires Python 3.11–3.13 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync --extra dev --extra cpu        # local CPU box
-uv sync --extra dev --extra cuda       # GPU machine (Kaggle: use cuda)
+uv sync                      # dev tools install by default (dependency-groups)
+uv sync --extra cpu          # local CPU box (torch CPU wheels)
+uv sync --extra cuda         # GPU machine (Kaggle: use cuda)
 ```
 
 > [!NOTE]
@@ -48,4 +49,4 @@ uv run pytest
 uv run aislop scan .
 ```
 
-Pre-commit runs all of the above on every commit (`pre-commit install` — already installed). Set `KAGGLE_USERNAME` + `KAGGLE_KEY` (or `~/.kaggle/kaggle.json`) and each commit also uploads the repo as a Kaggle dataset for GPU training; without credentials that step skips silently. `data/` (gigabytes of steel) and `models/` (weights) are excluded — upload data to Kaggle once, separately.
+Pre-commit runs all of the above on every commit (`pre-commit install` — already installed; hooks are declared in `.pre-commit-config.yaml`: ruff, pyrefly, pytest, and the Kaggle upload). Set `KAGGLE_USERNAME` + `KAGGLE_KEY` (or `~/.kaggle/kaggle.json`) and each commit also uploads the repo as a Kaggle dataset for GPU training; without credentials that step skips silently. `data/` (gigabytes of steel) and `models/` (weights) are excluded — upload data to Kaggle once, separately.

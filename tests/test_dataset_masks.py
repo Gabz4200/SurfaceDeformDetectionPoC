@@ -10,6 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
+from tests.helpers import write_image
+
 
 def _encode_mask(mask: np.ndarray) -> str:
     from PIL import Image
@@ -69,21 +71,18 @@ def test_when_empty_ann_then_no_lines() -> None:
 def test_when_datasetninja_layout_then_labels_generated() -> None:
     import tempfile
 
-    import cv2
-
     from surfacedeformdetectionpoc.dataset import build_yolo_dataset
 
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "data"
         img_dir = root / "train" / "img"
         ann_dir = root / "train" / "ann"
-        img_dir.mkdir(parents=True)
         ann_dir.mkdir(parents=True)
-        cv2.imwrite(str(img_dir / "s1.jpg"), np.full((50, 100, 3), 128, dtype=np.uint8))
+        write_image(img_dir / "s1.jpg", 100, 50)
         (ann_dir / "s1.jpg.json").write_text(json.dumps(_ann(np.ones((4, 4), bool), [10, 20])))
         out = Path(tmp) / "yolo"
         build_yolo_dataset(root, out, class_names=["scratch"], val_fraction=0.0)
-        assert _parse((out / "labels" / "train" / "s1.txt").read_text().strip()) == (
+        assert _parse((out / "labels" / "train" / "train__img__s1.txt").read_text().strip()) == (
             0,
             0.12,
             0.44,

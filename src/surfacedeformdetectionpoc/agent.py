@@ -53,6 +53,12 @@ class AutomotiveInspectionAgent:
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(parents=True, exist_ok=True)
 
+    def __enter__(self) -> AutomotiveInspectionAgent:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.db.close()
+
     def inspect_image(self, image_path: str | Path) -> dict[str, Any]:
         """Run the full pipeline on one image.
 
@@ -65,6 +71,10 @@ class AutomotiveInspectionAgent:
 
         Raises:
             FileNotFoundError: If the image cannot be read.
+
+        Note:
+            Use the agent as a context manager to close the database
+            connection after a batch.
         """
         src = Path(image_path)
         image = cv2.imread(str(src))
@@ -74,7 +84,9 @@ class AutomotiveInspectionAgent:
         artifact: str | None = None
         if dets:
             best = max(dets, key=lambda d: d.confidence)
-            defect_detected, confidence, class_label = True, best.confidence, best.label
+            defect_detected = True
+            confidence = best.confidence
+            class_label = best.label
             dest = self.results_dir / src.name
             cv2.imwrite(str(dest), _render_overlay(image, dets))
             artifact = str(dest)

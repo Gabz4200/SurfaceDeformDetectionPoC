@@ -4,13 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import cv2
-import numpy as np
-
-
-def _img(path: Path, w: int = 100, h: int = 50) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(path), np.full((h, w, 3), 128, dtype=np.uint8))
+from tests.helpers import write_image as _img
 
 
 def test_when_nested_subfolders_then_all_images_found() -> None:
@@ -45,6 +39,8 @@ def test_when_yolo_txt_present_then_labels_copied_and_yaml_valid() -> None:
         yaml_path = build_yolo_dataset(root, out, class_names=["scratch", "dent"], val_fraction=0.0)
         cfg = yaml.safe_load(yaml_path.read_text())
         assert cfg["names"] == {0: "scratch", 1: "dent"}
-        assert (out / "labels" / "train" / "s1.txt").read_text() == "0 0.5 0.5 0.2 0.1\n"
-        assert (out / "labels" / "train" / "bg.txt").read_text() == ""
-        assert (out / "images" / "train" / "s1.jpg").exists()
+        assert (
+            out / "labels" / "train" / "train__img__s1.txt"
+        ).read_text() == "0 0.5 0.5 0.2 0.1\n"
+        assert (out / "labels" / "train" / "extra__bg.txt").read_text() == ""
+        assert (out / "images" / "train" / "train__img__s1.jpg").exists()

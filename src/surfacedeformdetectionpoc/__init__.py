@@ -10,9 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 def _prepare(args: argparse.Namespace) -> int:
-    from surfacedeformdetectionpoc.dataset import build_yolo_dataset, class_names_from_meta
+    from surfacedeformdetectionpoc.dataset import build_yolo_dataset
+    from surfacedeformdetectionpoc.train import resolve_class_names
 
-    names = class_names_from_meta(args.meta) if args.meta else args.classes
+    names = resolve_class_names(args.meta, args.classes)
     yaml_path = build_yolo_dataset(
         data_root=Path(args.data),
         out_dir=Path(args.out),
@@ -50,11 +51,12 @@ def _inspect(args: argparse.Namespace) -> int:
         InspectionDB(args.db),
         args.results_dir,
     )
-    outs = (
-        agent.inspect_directory(args.path)
-        if Path(args.path).is_dir()
-        else [agent.inspect_image(args.path)]
-    )
+    with agent:
+        outs = (
+            agent.inspect_directory(args.path)
+            if Path(args.path).is_dir()
+            else [agent.inspect_image(args.path)]
+        )
     hits = sum(1 for o in outs if o["defect_detected"])
     logger.info("Inspected %d images, %d with defects.", len(outs), hits)
     return 0
@@ -68,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("prepare", help="Build a YOLO dataset from ./data.")
     p.add_argument("--data", default="data")
     p.add_argument("--out", default="models/yolo_dataset")
-    p.add_argument("--classes", nargs="*", default=["defect_1", "defect_2", "defect_3", "defect_4"])
+    p.add_argument("--classes", nargs="*", default=None)
     p.add_argument("--meta", default=None, help="DatasetNinja meta.json for class names.")
     p.add_argument("--val-fraction", type=float, default=0.2)
     p.add_argument("--seed", type=int, default=42)

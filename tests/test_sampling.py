@@ -4,14 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import cv2
-import numpy as np
 import pytest
 
-
-def _img(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(path), np.full((10, 10, 3), 128, dtype=np.uint8))
+from tests.helpers import write_image as _img
 
 
 def _layout(root: Path) -> None:

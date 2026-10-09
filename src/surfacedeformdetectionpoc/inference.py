@@ -39,16 +39,23 @@ def results_to_detections(results: Any, conf: float) -> list[Detection]:
         xyxy = np.asarray(boxes.xyxy)
         confs = np.asarray(boxes.conf).ravel()
         clses = np.asarray(boxes.cls).ravel()
-        for i in np.nonzero(confs >= conf)[0].tolist():
-            x1, y1, x2, y2 = tuple(float(v) for v in xyxy[i].tolist())
-            c = float(confs[i])
-            idx = int(clses[i])
+        keep = np.nonzero(confs >= conf)[0]
+        # Bulk conversions: .tolist() yields native floats once per
+        # array instead of boxing each scalar individually.
+        for row, c, idx in zip(
+            xyxy[keep].tolist(),
+            confs[keep].tolist(),
+            clses[keep].tolist(),
+            strict=True,
+        ):
+            x1, y1, x2, y2 = row
+            class_id = int(idx)
             dets.append(
                 Detection(
-                    label=names.get(idx, str(idx)),
-                    class_id=idx,
-                    confidence=c,
-                    bbox=(x1, y1, x2, y2),
+                    label=names.get(class_id, str(class_id)),
+                    class_id=class_id,
+                    confidence=float(c),
+                    bbox=(float(x1), float(y1), float(x2), float(y2)),
                 )
             )
     return dets

@@ -5,8 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import cv2
-import numpy as np
+from tests.helpers import write_image
 
 
 def test_when_meta_then_titles_in_order(tmp_path: Path) -> None:
@@ -21,8 +20,7 @@ def test_when_prepare_then_dataset_built(tmp_path: Path) -> None:
     from surfacedeformdetectionpoc import main
 
     src = tmp_path / "data"
-    src.mkdir()
-    cv2.imwrite(str(src / "s.jpg"), np.full((10, 10, 3), 128, dtype=np.uint8))
+    write_image(src / "s.jpg", 10, 10)
     (src / "s.txt").write_text("0 0.5 0.5 0.2 0.2\n")
     out = tmp_path / "yolo"
     assert main(["prepare", "--data", str(src), "--out", str(out), "--classes", "scratch"]) == 0

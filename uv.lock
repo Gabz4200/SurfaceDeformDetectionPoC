@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11, <3.14"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform == 'win32'",
@@ -1592,18 +1592,20 @@ cuda = [
     { name = "torch", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" } },
     { name = "torchvision", version = "0.21.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" } },
 ]
+headless = [
+    { name = "opencv-python-headless" },
+]
+kaggle = [
+    { name = "kagglehub" },
+]
+
+[package.dev-dependencies]
 dev = [
     { name = "pre-commit" },
     { name = "pyrefly" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
-]
-headless = [
-    { name = "opencv-python-headless" },
-]
-kaggle = [
-    { name = "kagglehub" },
 ]
 
 [package.metadata]
@@ -1613,19 +1615,23 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "opencv-python", specifier = ">=5.0.0.93" },
     { name = "opencv-python-headless", marker = "extra == 'headless'", specifier = ">=4.8.0.76" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.8.0" },
-    { name = "pyrefly", marker = "extra == 'dev'", specifier = ">=0.24.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.0" },
     { name = "torch", marker = "extra == 'cpu'", specifier = ">=2.5.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "surfacedeformdetectionpoc", extra = "cpu" } },
     { name = "torch", marker = "extra == 'cuda'", specifier = ">=2.5.0", index = "https://download.pytorch.org/whl/cu124", conflict = { package = "surfacedeformdetectionpoc", extra = "cuda" } },
     { name = "torchvision", marker = "extra == 'cpu'", specifier = ">=0.20.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "surfacedeformdetectionpoc", extra = "cpu" } },
     { name = "torchvision", marker = "extra == 'cuda'", specifier = ">=0.20.0", index = "https://download.pytorch.org/whl/cu124", conflict = { package = "surfacedeformdetectionpoc", extra = "cuda" } },
     { name = "ultralytics", specifier = ">=8.4.156" },
 ]
-provides-extras = ["cpu", "cuda", "headless", "dev", "kaggle"]
+provides-extras = ["cpu", "cuda", "headless", "kaggle"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pre-commit", specifier = ">=3.8.0" },
+    { name = "pyrefly", specifier = ">=0.24.0" },
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-cov", specifier = ">=5.0.0" },
+    { name = "ruff", specifier = ">=0.6.0" },
+]
 
 [[package]]
 name = "sympy"
